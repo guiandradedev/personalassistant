@@ -15,18 +15,30 @@ bot.
 
 import re, requests
 import logging
+import json
+import random
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram import (Poll, ParseMode, KeyboardButton, KeyboardButtonPollType, ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, PollAnswerHandler, PollHandler, MessageHandler, Filters, ConversationHandler)
+from telegram import (InlineKeyboardMarkup, InlineKeyboardButton)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
+                          ConversationHandler, CallbackQueryHandler)
+
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+TELEGRAM_TOKEN_ID = '1363716020:AAFgLfvVz9YJ4DqhJBZ0-va6oPnpzxfiL_o'
+URL = "https://api.telegram.org/bot{}/".format(TELEGRAM_TOKEN_ID)
+
 
 def start(update, context):
     """Inform user about what this bot can do"""
-    update.message.reply_text('Oi, estou aqui! O que você precisa?')
+    update.message.reply_text('Oi, estou aqui! O que você precisa? /dogo /gatineo /clima /piada /spotifyme')
 
+def echo(update, context):
+    """Echo the user message."""
+    update.message.reply_text(update.message.text)
 
 def poll(update, context):
     """Sends a predefined poll"""
@@ -37,7 +49,6 @@ def poll(update, context):
     payload = {message.poll.id: {"questions": questions, "message_id": message.message_id,
                                  "chat_id": update.effective_chat.id, "answers": 0}}
     context.bot_data.update(payload)
-
 
 def receive_poll_answer(update, context):
     """Summarize a users poll vote"""
@@ -65,7 +76,6 @@ def receive_poll_answer(update, context):
         context.bot.stop_poll(context.bot_data[poll_id]["chat_id"],
                               context.bot_data[poll_id]["message_id"])
 
-
 def quiz(update, context):
     """Send a predefined poll"""
     questions = ["1", "2", "4", "20"]
@@ -75,7 +85,6 @@ def quiz(update, context):
     payload = {message.poll.id: {"chat_id": update.effective_chat.id,
                                  "message_id": message.message_id}}
     context.bot_data.update(payload)
-
 
 def receive_quiz_answer(update, context):
     """Close quiz after three participants took it"""
@@ -90,7 +99,6 @@ def receive_quiz_answer(update, context):
             return
         context.bot.stop_poll(quiz_data["chat_id"], quiz_data["message_id"])
 
-
 def preview(update, context):
     """Ask user to create a poll and display a preview of it"""
     # using this without a type lets the user chooses what he wants (quiz or poll)
@@ -100,7 +108,6 @@ def preview(update, context):
     update.effective_message.reply_text(message,
                                         reply_markup=ReplyKeyboardMarkup(button,
                                                                          one_time_keyboard=True))
-
 
 def receive_poll(update, context):
     """On receiving polls, reply to it by a closed poll copying the received poll"""
@@ -115,11 +122,9 @@ def receive_poll(update, context):
         reply_markup=ReplyKeyboardRemove()
     )
 
-
 def help_handler(update, context):
     """Display a help message"""
     update.message.reply_text("Use /quiz, /poll ou /preview para acessar meus talentos.")
-
 
 def cancel(update, context):
     user = update.message.from_user
@@ -129,44 +134,49 @@ def cancel(update, context):
 
     return ConversationHandler.END
 
+def receive_quiz_answer(update, context):
+    """Close quiz after three participants took it"""
+    # the bot can receive closed poll updates we don't care about
+    if update.poll.is_closed:
+        return
+    if update.poll.total_voter_count == 3:
+        try:
+            quiz_data = context.bot_data[update.poll.id]
+        # this means this poll answer update is from an old poll, we can't stop it then
+        except KeyError:
+            return
+        context.bot.stop_poll(quiz_data["chat_id"], quiz_data["message_id"])
 
-def get_url():
-    contents = requests.get('https://random.dog/woof.json').json()
-    url = contents['url']
-    return url
+def dogo(update, context):
+    '''
+    '''
+    import randonDogo as rd
+    count = 0
+    while(count<3):
+        url = rd.get_onedogo()
+        context.bot.send_photo(chat_id=update.effective_chat.id, photo = url)
+        count=count+1
 
-def get_image_url():
-    allowed_extension = ['jpg','jpeg','png']
-    file_extension = ''
-    while file_extension not in allowed_extension:
-        url = get_url()
-        file_extension = re.search("([^.]*)$",url).group(1).lower()
-    print("got url %s"%url)
-    return url
+def gatineo(update, context):
+    '''
+    '''
 
+    import randonCat as rc
+    count = 0
+    while(count<3):
+        url = rc.get_onecat()
+        context.bot.send_photo(chat_id=update.effective_chat.id, photo = url)
+        count=count+1
 
-def bop(update, context):
-    print("reached bop")
-    url = get_image_url()
-    context.bot.send_photo(chat_id=update.effective_chat.id, photo = url)
-
-
-def listacompra(update, context):
-    """Inform user about what this bot can do"""
-    update.message.reply_text('me envia uma foto da sua compra')
-
-    voice_handler(update, context)
-
-    photo_url = ''
-    chat_id = chat_id,
-    photo = photo_url,
-    caption = "lista_de_compras"
-
+def piada(update, context):
+    '''
+    '''
+    import pyjokes
+    update.message.reply_text(pyjokes.get_joke())
 
 def voice_handler(update, context):
     
     update.download_file(msg['photo'][-1]['file_id'], './file.png')
-
 
 def detect_text():
     """Detects text in the file."""
@@ -200,7 +210,84 @@ def detect_text():
             'https://cloud.google.com/apis/design/errors'.format(
                 response.error.message))
 
+def get_weather(update, context):
+    '''
+    Inform user about the weather
+    '''
+    
+    import weather
+    myCity = "Pato Branco"
+    temperature, temperature_feelslike, humidity, skyCondition, uvi = weather.get_weather(myCity)
 
+    if skyCondition == "Clear":
+        skyCondition = "limpo"
+    
+    if uvi<5.9:
+        msg = "Temperatura: " + '{:02.2f}'.format(temperature) + "ºC\nEstado do Céu: " + skyCondition + '\nRaios UV estão seguros!\nUmidade: ' + str(humidity)
+
+    elif (uvi>5.9) and (uvi<=7.9):
+        msg = "Temperatura: " + '{:02.2f}'.format(temperature) + "ºC\nEstado do Céu: " + skyCondition + '\nRaios UV estão no nível Laranja (' + str(uvi) + '), ou seja, muito altos!\nUmidade: ' + str(humidity)
+    
+    elif uvi>7.9:
+        msg = "Temperatura: " + '{:02.2f}'.format(temperature) + "ºC\nEstado do Céu: " + skyCondition + "! " + '\nRaios UV estão no nível Vermelho (' + str(uvi) + '), então não saia no sol\nUmidade: ' + str(humidity)
+
+
+    update.message.reply_text(msg)
+
+def get_json_from_url(url):
+    content = get_url(url)
+    js = json.loads(content)
+    return js
+
+def get_url(url):
+    response = requests.get(url)
+    content = response.content.decode("utf8")
+    return content
+
+def spotify(update, context):
+    '''
+    '''
+
+    # Imports
+    import sys
+    sys.path.append('../spotify_analyzer/')
+    import spotify_code as sc
+
+    num_tracks = 20
+
+    chat_id=update.effective_chat.id
+    
+    # -------- GET SEED/GENRE -------- #
+    genres = sc.get_genres()
+    num_genres = len(genres)
+    genre_choice = random.randint(0,(num_genres-1))
+    
+    update.message.reply_text("Escolhendo músicas e adicionando na playlist...")
+    
+    # -------- CREATE NEW PLAYLIST -------- #
+    username = 'guilherme_andrade_' 
+    scope = 'playlist-modify-public'
+    newplaylist_id,playlist_link = sc.set_playlist(username,"Fuck off, I'm Samantha! " + str(genres[genre_choice]).capitalize(),"As músicas dessa playlist foram escolhidas pela Samantha, uma assistente pessoal baseada em inteligência artificial.")
+
+    # -------- CLASSIFIER -------- #
+    import neural_network
+    num_tracks,tracks_analysis = sc.get_new_tracks(num_tracks,str(genres[genre_choice]))
+
+    id_list = []
+    i=0
+    while(i<num_tracks):
+
+        if(neural_network.NN(tracks_analysis.loc[i,'popularity'],tracks_analysis.loc[i,'danceability'],tracks_analysis.loc[i,'energy'],tracks_analysis.loc[i,'key'],tracks_analysis.loc[i,'loudness'],tracks_analysis.loc[i,'mode'],tracks_analysis.loc[i,'speechiness'],tracks_analysis.loc[i,'acousticness'],tracks_analysis.loc[i,'instrumentalness'],tracks_analysis.loc[i,'liveness'],tracks_analysis.loc[i,'valence'],tracks_analysis.loc[i,'tempo']))==1:
+            print(tracks_analysis.loc[i,'spotify_link'],tracks_analysis.loc[i,'name_track'],tracks_analysis.loc[i,'id_track'])
+            id_list.append(tracks_analysis.loc[i,'id_track'])
+
+        i = i + 1
+
+
+    # -------- PUT SELECTED TRACKS IN THE NEW PLAYLIST -------- #
+    sc.insert_tracks_playlist(newplaylist_id,id_list)
+    update.message.reply_text("Sua playlist tá quentinha!")
+    update.message.reply_text(playlist_link)
 
 def main():
 
@@ -214,7 +301,7 @@ def main():
     dp = updater.dispatcher
 
     # Add conversation handler
-    dp.add_handler(CommandHandler('start', start))
+    """
     dp.add_handler(CommandHandler('poll', poll))
     dp.add_handler(PollAnswerHandler(receive_poll_answer))
     dp.add_handler(CommandHandler('quiz', quiz))
@@ -222,8 +309,15 @@ def main():
     dp.add_handler(CommandHandler('preview', preview))
     dp.add_handler(MessageHandler(Filters.poll, receive_poll))
     dp.add_handler(CommandHandler('help', help_handler))
-    dp.add_handler(CommandHandler('listacompra', listacompra))
-    dp.add_handler(CommandHandler('fofo',bop))
+    """
+
+    dp.add_handler(CommandHandler('start', start))
+    dp.add_handler(CommandHandler('dogo',dogo))
+    dp.add_handler(CommandHandler('gatineo',gatineo))
+    dp.add_handler(CommandHandler('clima',get_weather))
+    dp.add_handler(CommandHandler('piada',piada))
+    dp.add_handler(CommandHandler('spotifyme',spotify))
+    #dp.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
 
     # Start the Bot
     updater.start_polling()
@@ -232,7 +326,6 @@ def main():
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
-
 
 if __name__ == '__main__':
     main()
